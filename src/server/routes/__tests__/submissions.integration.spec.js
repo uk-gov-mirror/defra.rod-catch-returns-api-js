@@ -4,6 +4,7 @@ import {
 } from '../../../test-utils/server-test-utils.js'
 import {
   handleCreateCRMActivity,
+  handleUnlockCRMActivity,
   handleUpdateCRMActivity
 } from '../../../services/crm.service.js'
 import { Submission } from '../../../entities/index.js'
@@ -722,7 +723,7 @@ describe('submissions.integration', () => {
       })
     })
 
-    it('should successfully update a submission with a valid status', async () => {
+    it('should successfully lock and unlock existing submissions', async () => {
       const createdSubmission = await createSubmission(
         server,
         CONTACT_IDENTIFIER_UPDATE_SUBMISSION
@@ -730,16 +731,25 @@ describe('submissions.integration', () => {
       const submissionId = JSON.parse(createdSubmission.payload).id
       expect(JSON.parse(createdSubmission.payload).status).toBe('INCOMPLETE')
 
-      const updatedSubmission = await server.inject({
+      const submittedSubmission = await server.inject({
         method: 'PATCH',
         url: `/api/submissions/${submissionId}`,
         payload: {
           status: 'SUBMITTED'
         }
       })
+      expect(JSON.parse(submittedSubmission.payload).status).toBe('SUBMITTED')
+      expect(submittedSubmission.statusCode).toBe(200)
 
-      expect(JSON.parse(updatedSubmission.payload).status).toBe('SUBMITTED')
-      expect(updatedSubmission.statusCode).toBe(200)
+      const unlockedSubmission = await server.inject({
+        method: 'PATCH',
+        url: `/api/submissions/${submissionId}`,
+        payload: {
+          status: 'INCOMPLETE'
+        }
+      })
+      expect(JSON.parse(unlockedSubmission.payload).status).toBe('INCOMPLETE')
+      expect(unlockedSubmission.statusCode).toBe(200)
     })
 
     it('should successfully update a submission when reportingExclude is true', async () => {
@@ -811,6 +821,29 @@ describe('submissions.integration', () => {
         url: `/api/submissions/${submissionId}`,
         payload: {
           status: 'SUBMITTED'
+        }
+      })
+
+      expect(JSON.parse(result.payload)).toStrictEqual({
+        error: 'Error updating submission'
+      })
+      expect(result.statusCode).toBe(500)
+    })
+
+    it('should return a 500 when the call to unlock an activity in CRM throws an error', async () => {
+      handleUnlockCRMActivity.mockRejectedValueOnce(new Error('CRM error'))
+
+      const createdSubmission = await createSubmission(
+        server,
+        CONTACT_IDENTIFIER_UPDATE_SUBMISSION
+      )
+      const submissionId = JSON.parse(createdSubmission.payload).id
+
+      const result = await server.inject({
+        method: 'PATCH',
+        url: `/api/submissions/${submissionId}`,
+        payload: {
+          status: 'INCOMPLETE'
         }
       })
 

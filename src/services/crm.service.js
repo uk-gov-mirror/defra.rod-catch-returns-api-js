@@ -52,6 +52,51 @@ export const handleCreateCRMActivity = async (contactId, season) => {
 }
 
 /**
+ * Unlocks a previously submitted RCR CRM activity for a given contact and season.
+ *
+ * @param {string} contactId - The unique identifier of the contact whose RCR CRM activity should be updated.
+ * @param {number} season - The season year of the activity to update.
+ * @param {string} status - Whether the activity is STARTED or SUBMITTED.
+ *
+ * @returns {Promise<void>} Resolves when the activity has been successfully updated.
+ *
+ * @throws {Error} Throws if the number of activities found is not exactly one.
+ * @throws {Error} Throws if persisting the updated activity fails.
+ */
+const findAndUpdateExistingRcrActivity = async (contactId, season, status) => {
+  logger.info(
+    `Fetching RCR CRM Activities for update: contactId=${contactId}, season=${season}`
+  )
+  const rcrActivityResult = await getCRMActivitiesContactById(contactId, season)
+
+  logger.info(
+    `RCR CRM Activities found for update: contactId=${contactId}, season=${season}, result=${JSON.stringify(rcrActivityResult)}`
+  )
+
+  if (rcrActivityResult.length !== 1) {
+    throw new Error(
+      `The number of RCR CRM Activities found for contactId=${contactId}, season=${season} is not 1 result=${JSON.stringify(rcrActivityResult)}`
+    )
+  }
+
+  const rcrActivity = rcrActivityResult[0].entity
+  rcrActivity.status = status
+  rcrActivity.submittedDate = new Date()
+  logger.info(
+    `Updating RCR CRM Activities for: contactId=${contactId}, season=${season} with details=${JSON.stringify(rcrActivity)}`
+  )
+
+  try {
+    await persist([rcrActivity])
+  } catch (err) {
+    logger.error(
+      `Error updating RCR CRM Activity for contactId=${contactId}, season=${season}, please check the database and crm to see if the details match`
+    )
+    throw err
+  }
+}
+
+/**
  * Retrieves CRM activities for a specific contact and season.
  *
  * @param {string} contactId - The unique identifier of the contact.
@@ -105,45 +150,33 @@ export const createCRMActivity = async (contactId, season) => {
 }
 
 /**
- * Updates the RCR CRM activity for a given contact and season.
+ * Updates and submits the RCR CRM activity for a given contact and season.
  *
  * @param {string} contactId - The unique identifier of the contact whose RCR CRM activity should be updated.
  * @param {number} season - The season year of the activity to update.
  *
  * @returns {Promise<void>} Resolves when the activity has been successfully updated.
- *
- * @throws {Error} Throws if the number of activities found is not exactly one.
- * @throws {Error} Throws if persisting the updated activity fails.
  */
 export const handleUpdateCRMActivity = async (contactId, season) => {
-  logger.info(
-    `Fetching RCR CRM Activities for update: contactId=${contactId}, season=${season}`
+  await findAndUpdateExistingRcrActivity(
+    contactId,
+    season,
+    RCR_ACTIVITY_STATUS.SUBMITTED
   )
-  const rcrActivityResult = await getCRMActivitiesContactById(contactId, season)
+}
 
-  logger.info(
-    `RCR CRM Activities found for update: contactId=${contactId}, season=${season}, result=${JSON.stringify(rcrActivityResult)}`
+/**
+ * Unlocks a previously submitted RCR CRM activity for a given contact and season.
+ *
+ * @param {string} contactId - The unique identifier of the contact whose RCR CRM activity should be updated.
+ * @param {number} season - The season year of the activity to update.
+ *
+ * @returns {Promise<void>} Resolves when the activity has been successfully updated.
+ */
+export const handleUnlockCRMActivity = async (contactId, season) => {
+  await findAndUpdateExistingRcrActivity(
+    contactId,
+    season,
+    RCR_ACTIVITY_STATUS.STARTED
   )
-
-  if (rcrActivityResult.length !== 1) {
-    throw new Error(
-      `The number of RCR CRM Activities found for contactId=${contactId}, season=${season} is not 1 result=${JSON.stringify(rcrActivityResult)}`
-    )
-  }
-
-  const rcrActivity = rcrActivityResult[0].entity
-  rcrActivity.status = RCR_ACTIVITY_STATUS.SUBMITTED
-  rcrActivity.submittedDate = new Date()
-  logger.info(
-    `Updating RCR CRM Activities for: contactId=${contactId}, season=${season} with details=${JSON.stringify(rcrActivity)}`
-  )
-
-  try {
-    await persist([rcrActivity])
-  } catch (err) {
-    logger.error(
-      `Error updating RCR CRM Activity for contactId=${contactId}, season=${season}, please check the database and crm to see if the details match`
-    )
-    throw err
-  }
 }
