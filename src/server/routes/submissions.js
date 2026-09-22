@@ -334,7 +334,8 @@ export default [
               submission.contactId,
               submission.season
             )
-          } else if (status === STATUSES.INCOMPLETE) {
+          }
+          if (status === STATUSES.INCOMPLETE) {
             logger.info(
               'Updating CRM activity with request:',
               submission.contactId,
